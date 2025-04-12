@@ -40,11 +40,11 @@
          // Ask for input
          printf("Obtaining data for spherical segment number %d\n", count + 1);
          printf("What is the radius of the sphere (R)? \n");
-         scanf("%f", &R);
+         scanf("%lf", &R);
          printf("What is the height of the top area of the spherical segment (ha)? \n");
-         scanf("%f", &ha);
+         scanf("%lf", &ha);
          printf("What is the height of the bottom area of the spherical segment (hb)? \n");
-         scanf("%f", &hb);
+         scanf("%lf", &hb);
  
          // Echo the inputs to confirm they were read correctly
          printf("Entered data: R = %.2f ha = %.2f hb = %.2f.\n", R, ha, hb);
