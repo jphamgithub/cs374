@@ -85,8 +85,9 @@
          // Total surface area = top + bottom + lateral
          float totalSurfaceArea = topArea + bottomArea + lateralArea;
  
-         // Volume = (1/3)π(ha² + hb² + ha*hb)(R - hb)
-         float volume = (1.0 / 3.0) * pi * (ha * ha + hb * hb + ha * hb) * (R - hb);
+         // Correct formula for volume of spherical segment between ha and hb:
+         // V = (π/6) * [(3R - ha)*ha² - (3R - hb)*hb²]
+         float volume = (pi / 6.0) * ((3 * R - ha) * ha * ha - (3 * R - hb) * hb * hb);
  
          // Print out results for this segment
          printf("Total Surface Area = %.2f Volume = %.2f.\n", totalSurfaceArea, volume);
