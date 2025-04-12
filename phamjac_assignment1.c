@@ -30,12 +30,12 @@
  
      // Initialize counters and totals for surface area and volume
      int count = 0;  
-     float totalSurfaceSum = 0;
-     float totalVolumeSum = 0;
+     double totalSurfaceSum = 0;
+     double totalVolumeSum = 0;
  
      // Loop until we've collected and calculated info for 'n' valid segments
      while (count < n) {
-         float R, ha, hb;
+         double R, ha, hb;
  
          // Ask for input
          printf("Obtaining data for spherical segment number %d\n", count + 1);
@@ -58,24 +58,24 @@
              continue;  // skip this iteration and re-ask for input
          }
  
-         float pi = 3.14159265359;
+         double pi = 3.14159265359;
  
          // Surface area calculations using formulas
          // topArea = pi * (R^2 - ha^2)
-         float topArea = pi * (R * R - ha * ha);
+         double topArea = pi * (R * R - ha * ha);
  
          // bottomArea = pi * (R^2 - hb^2)
-         float bottomArea = pi * (R * R - hb * hb);
+         double bottomArea = pi * (R * R - hb * hb);
  
          // lateralArea = 2 * pi * R * (ha - hb)
-         float lateralArea = 2 * pi * R * (ha - hb);
+         double lateralArea = 2 * pi * R * (ha - hb);
  
          // total surface area = top + bottom + lateral
-         float totalSurfaceArea = topArea + bottomArea + lateralArea;
+         double totalSurfaceArea = topArea + bottomArea + lateralArea;
  
          // Correct formula for volume of a spherical segment between two planes
          // volume = (pi / 6) * [(3R - ha) * ha^2 - (3R - hb) * hb^2]
-         float volume = (pi / 6.0) * ((3 * R - ha) * ha * ha - (3 * R - hb) * hb * hb);
+         double volume = (pi / 6.0) * ((3 * R - ha) * ha * ha - (3 * R - hb) * hb * hb);
  
          // Print the results for this segment
          printf("Total Surface Area = %.2f Volume = %.2f.\n", totalSurfaceArea, volume);
