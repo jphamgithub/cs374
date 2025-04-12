@@ -73,9 +73,12 @@
          // total surface area = top + bottom + lateral
          double totalSurfaceArea = topArea + bottomArea + lateralArea;
  
-         // Correct formula for volume of a spherical segment between two planes
-         // volume = (pi / 6) * [(3R - ha) * ha^2 - (3R - hb) * hb^2]
-         double volume = (1.0 / 3.0) * pi * (ha * ha + hb * hb + ha * hb) * (R - hb);
+         // Volume = (1/6) * pi * h * (3a^2 + 3b^2 + h^2)
+         // where a and b are the base radiuses, and h is the height between them
+         double h = ha - hb;
+         double a = sqrt(R * R - hb * hb);  // bottom base radius
+         double b = sqrt(R * R - ha * ha);  // top base radius
+         double volume = (1.0 / 6.0) * pi * h * (3 * a * a + 3 * b * b + h * h);
  
          // Print the results for this segment
          printf("Total Surface Area = %.2f Volume = %.2f.\n", totalSurfaceArea, volume);
