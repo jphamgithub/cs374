@@ -75,7 +75,7 @@
  
          // Correct formula for volume of a spherical segment between two planes
          // volume = (pi / 6) * [(3R - ha) * ha^2 - (3R - hb) * hb^2]
-         double volume = (pi / 6.0) * ((3 * R - ha) * ha * ha - (3 * R - hb) * hb * hb);
+         double volume = (1.0 / 3.0) * pi * (ha * ha + hb * hb + ha * hb) * (R - hb);
  
          // Print the results for this segment
          printf("Total Surface Area = %.2f Volume = %.2f.\n", totalSurfaceArea, volume);
