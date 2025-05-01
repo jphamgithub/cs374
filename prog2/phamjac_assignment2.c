@@ -273,7 +273,7 @@ void print_movies_by_year(movie_t *p_head, int target_year)
 void print_highest_rated_by_year(movie_t *p_head)
 {
     // this goes year-by-year from 1900 to 2025 (as per assignment spec)
-    // not super efficient — we're looping over the list for every year
+    // not super efficient.. we're looping over the list for every year
     for (int year = 1900; year <= 2025; year++)
     {
         movie_t *p_best = NULL; // will point to the best-rated movie found so far for this year
