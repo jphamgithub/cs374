@@ -47,16 +47,18 @@ https://canvas.oregonstate.edu/courses/1999732/pages/exploration-stdin-stdout-st
  #define ONID "phamjac"           // my id
  
  // function declarations up top so compiler knows about them
- char * find_largest_file (void);            // finds biggest csv file
- char * find_smallest_file (void);           // finds smallest csv file
- char * prompt_for_filename (void);          // asks user to type a name
+ char * find_largest_file (void);            
+ char * find_smallest_file (void);           
+ char * prompt_for_filename (void);          
  void process_file (const char * p_filename); // does all the work for a file
- char * create_directory (void);             // makes a new folder to store stuff
+ char * create_directory (void);             
  void write_movies_by_year (const char * p_filename, const char * p_dirname); // splits movie titles by year
+ 
+ // helper funcs
  int starts_with (const char * p_str, const char * p_prefix); // checks prefix
  int ends_with (const char * p_str, const char * p_suffix);   // checks suffix
  
- int main (void) // entry point for the program
+ int main (void) 
  {
      int main_choice = 0; // holds what the user picks from main menu
  
@@ -107,7 +109,7 @@ https://canvas.oregonstate.edu/courses/1999732/pages/exploration-stdin-stdout-st
                  printf("Now processing the chosen file named %s\n", p_filename); // show filename
                  process_file(p_filename); // do the thing
                  free(p_filename);         // cleanup
-                 p_filename = NULL;        // avoid dangling ptr
+                 p_filename = NULL;        // avoid dangling ptr kind of like calloc does
                  break;                    // done
              }
          }
