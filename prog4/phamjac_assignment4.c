@@ -51,14 +51,14 @@ Summary of each function's job
 
 Basic Tests to run when you run shell:
 
-#ones i made
+#test the linux commands i built
 cd ..         # change directory
 cd            # go to HOME
 pwd           # verify directory changed
 status        # check exit value of last foreground command
 exit          # exits the shell
 
-# normal ones
+# normal linux commands
 ls            # list files
 echo hello    # should print "hello"
 sleep 1       # test if it delays and exits cleanly
@@ -93,26 +93,60 @@ sleep 5 &        # should NOT background (runs in foreground)
 // Required Libraries
 // ====================
 
-// standard libs
-// need this for printf, fgets, fflush for prompt and output
+// Standard I/O library
+// - printf(), fgets(), perror(), fflush()
+// - used for printing to console and reading input
 #include <stdio.h>
-// needed this for malloc, free, exit to handle memory and quitting
+
+// Standard library
+// - malloc(), free(), exit(), getenv()
+// - used for memory allocation, exiting shell, and env vars
 #include <stdlib.h>
-// need this for parsing commands like strtok, strcmp, strdup
+
+// String functions
+// - strtok(), strcmp(), strdup()
+// - used for tokenizing user input and string comparisons
 #include <string.h>
-// core posix stuff for fork, execvp, chdir, getpid
+
+// POSIX process control
+// - fork(), execvp(), chdir(), getpid(), dup2(), STDIN_FILENO, STDOUT_FILENO
+// - used for creating child processes, running commands, I/O redirection
 #include <unistd.h>
-// needed this once I started using pid_t for fork/waitpid
+
+// Data types
+// - pid_t (process ID)
+// - used for storing process IDs of forked child processes
 #include <sys/types.h>
-// used for waitpid and checking child exit status
+
+// Wait and status
+// - waitpid(), WIFEXITED(), WEXITSTATUS(), WIFSIGNALED(), WTERMSIG()
+// - used for tracking exit status of child/background processes
 #include <sys/wait.h>
-// needed this for true/false style flags like is_bg
+
+// Booleans
+// - bool, true, false
+// - makes conditions easier to read (alternative to int flags)
 #include <stdbool.h>
 
-// i/o and process control
-// needed this once I added input/output redirection using open
+// File control
+// - open(): opens a file and returns a file descriptor (like a handle)
+// - O_RDONLY: open file for reading only (used with <)
+// - O_WRONLY: open file for writing only (used with >)
+// - O_CREAT: create file if it doesn't exist (used with >)
+// - O_TRUNC: erase file contents if it already exists (used with >)
+// -- These are used when setting up redirection like < input.txt or > output.txt
 #include <fcntl.h>
-// brought this in to handle signals like ctrl+c and ctrl+z
+
+// Signal handling
+// - struct sigaction: a struct that lets us customize what happens when signals arrive (like Ctrl+C)
+// - sigaction(): installs the behavior we set up in sigaction struct
+// - sigfillset(): blocks other signals temporarily while a signal is being handled
+// - SIGINT: signal sent by Ctrl+C (normally kills a process)
+// - SIGTSTP: signal sent by Ctrl+Z (normally pauses a process)
+// - SIG_IGN: tells the OS to ignore the signal completely
+// - SIG_DFL: tells the OS to use the default behavior for the signal
+// - SA_RESTART: makes sure things like fgets() restart automatically if interrupted
+// -- This block lets us ignore Ctrl+C in the shell and use Ctrl+Z to toggle foreground-only mode
 #include <signal.h>
 
 // ====================
@@ -126,6 +160,11 @@ sleep 5 &        # should NOT background (runs in foreground)
 // made this up - max background processes my shell will track
 #define MAX_BG_PROCS 100
 
+
+
+// ====================
+// Primary Struct
+// ====================
 
 /**
  * Struct that holds all parsed parts of a user command.
@@ -169,20 +208,22 @@ pid_t bg_pids[MAX_BG_PROCS];
 // I bump this every time I add a new one to bg_pids
 int bg_count = 0;
 
-// ====================
-// Helper Functions
-// ====================
 
+// ====================
+// Primary Functions
+// ====================
 
 /**
  * SIGTSTP handler (triggered by Ctrl+Z)
  * Toggles foreground-only mode on/off and prints a message
- * Doesn't kill the shell — just changes how we treat '&' at end of commands
+ * Doesn't kill the shell... just changes how we treat '&' at end of commands
+ * In reality just flipping a variable
  */
-void handle_sigtstp(int signo) {
+void handle_sigtstp(int signal_number) {
     
     // if we're NOT already in foreground-only mode...
-    if (!fg_only_mode) {
+    if (!fg_only_mode) 
+    {
 
         // build the message to show the user that backgrounding is now disabled
         // \n at the start makes it play nice if command was mid-line
@@ -197,7 +238,8 @@ void handle_sigtstp(int signo) {
         // flip the mode to true ... now backgrounding will be ignored
         fg_only_mode = true;
 
-    } else {
+    } else 
+    {
         // same logic, but now we're turning foreground-only mode off
 
         // build message saying it's safe to background again
@@ -218,30 +260,32 @@ void handle_sigtstp(int signo) {
  */
 void setup_signals() {
     // setup for SIGINT (Ctrl+C)
-    // the shell itself should ignore Ctrl+C — we don't want the shell to close when the user hits it
-    // only foreground child processes (like sleep or cat) should die on Ctrl+C
-    struct sigaction sa_int = {0};        // zero-init the struct just in case
-    sa_int.sa_handler = SIG_IGN;          // ignore the signal entirely in the parent shell
-    sigaction(SIGINT, &sa_int, NULL);     // register the ignore handler for SIGINT
+    // we want the shell itself to ignore Ctrl+C so it doesn’t exit when pressed
+    // only foreground child processes (like sleep or cat) should be killed by Ctrl+C
+    // you can't pass SIG_IGN directly into sigaction() ... you have to fill in a struct
+    struct sigaction ignore_sigint_action = {0};    // start with a zeroed-out struct
+    ignore_sigint_action.sa_handler = SIG_IGN;      // tell it to ignore the signal
+    sigaction(SIGINT, &ignore_sigint_action, NULL); // apply that rule to SIGINT
 
     // setup for SIGTSTP (Ctrl+Z)
-    // when the user presses Ctrl+Z, we want to toggle foreground-only mode
-    // this doesn't kill the shell — instead, it changes how & is handled
-    struct sigaction sa_tstp = {0};       
-    sa_tstp.sa_handler = handle_sigtstp;  // we tell the OS: run handle_sigtstp() when SIGTSTP happens
-    sa_tstp.sa_flags = SA_RESTART;        // auto-restart things like fgets if interrupted (from exploration note)
-    sigfillset(&sa_tstp.sa_mask);         // block other signals during handler to avoid conflicts
-    sigaction(SIGTSTP, &sa_tstp, NULL);   // register this custom handler for SIGTSTP
+    // we want the shell to toggle foreground-only mode when Ctrl+Z is pressed
+    // this doesn’t kill anything, just flips a flag
+    struct sigaction toggle_fg_mode_action = {0};         // make a fresh struct for SIGTSTP
+    toggle_fg_mode_action.sa_handler = handle_sigtstp;    // when Ctrl+Z is pressed, call our function
+    toggle_fg_mode_action.sa_flags = SA_RESTART;          // restart functions like fgets if they get interrupted
+    sigfillset(&toggle_fg_mode_action.sa_mask);           // block other signals during our handler
+    sigaction(SIGTSTP, &toggle_fg_mode_action, NULL);     // apply the handler to SIGTSTP
 }
 
 /**
  * Gets user input, tokenizes it, and stores it in a command_line struct
  * Skips comment lines (starting with #) and blank lines
  * Handles input/output redirection and backgrounding '&'
+ * Taken from SAMPLE CODE teacher gave
  */
 struct command_line *parse_input() {
     char input[INPUT_LENGTH]; // raw user input
-    struct command_line *cmd = calloc(1, sizeof(struct command_line)); // alloc new struct
+    struct command_line *cmd = calloc(1, sizeof(struct command_line)); // calloc new struct
 
     printf(": "); // show prompt
     fflush(stdout); // flush so user sees prompt immediately
@@ -270,25 +314,48 @@ struct command_line *parse_input() {
 
 /**
  * Checks for completed background processes
- * Prints exit status or signal of completed background jobs
- * Called at the top of every main loop iteration
+ * - Loops through the list of tracked background process IDs
+ * - Uses waitpid() with WNOHANG to do a non-blocking check
+ * - If the process has finished, prints whether it exited normally or was killed by a signal
+ * - Marks that slot in the bg_pids array as cleaned up (-1)
+ *
+ * Uses:
+ * - waitpid() from <sys/wait.h>: lets us check if a specific process has finished
+ * - WNOHANG: tells waitpid() to return immediately if the process is still running
+ * - WIFEXITED(), WEXITSTATUS(): macros to check and get the exit code of a normal exit
+ * - WIFSIGNALED(), WTERMSIG(): macros to check and get the signal number if killed by signal
+ * - fflush(stdout): forces printf to actually display output immediately
  */
 void check_bg_procs() {
     for (int i = 0; i < bg_count; i++) {
-        int status;
-        pid_t result = waitpid(bg_pids[i], &status, WNOHANG); // non-blocking check
+        int status;  // will hold exit info for the process
+        // check if this background process has finished (non-blocking)
+        pid_t result = waitpid(bg_pids[i], &status, WNOHANG);
+
+        // if waitpid returned a positive PID, it means the process has finished
+        // of note you don't compare status to a known number
+        // pass to helper funcs to check what the status is
         if (result > 0) {
+            // check if the child exited normally (like return 0)
             if (WIFEXITED(status)) {
                 printf("background pid %d is done: exit value %d\n", result, WEXITSTATUS(status));
-            } else if (WIFSIGNALED(status)) {
+            }
+            // check if it was killed by a signal (like Ctrl+C or kill command)
+            else if (WIFSIGNALED(status)) {
                 printf("background pid %d is done: terminated by signal %d\n", result, WTERMSIG(status));
             }
-            fflush(stdout); // make sure it's printed
-            bg_pids[i] = -1; // mark as cleaned up
+
+            // flush printf output to make sure it's visible right away
+            // forces the buffer to empty into the terminal right away
+            fflush(stdout);
+
+            // mark this process slot as done so we don’t check it again
+            // empty negative process id basically
+            // next time through the loop, waitpid(-1, ...) won’t match anything useful
+            bg_pids[i] = -1;
         }
     }
 }
-
 /**
  * Frees all memory used by a command_line struct
  * Called after each loop in main once command is done
@@ -328,14 +395,32 @@ bool handle_builtin(struct command_line *cmd) {
         return true;
     }
 
-    // status command - report last foreground exit/signal
+    // status command - report how the last foreground process ended
+    // this is a built-in command like "cd" and "exit"
     else if (strcmp(cmd->argv[0], "status") == 0) {
+
+        // check if the last foreground process exited normally (e.g., returned 0 or 1)
+        // WIFEXITED is a macro from <sys/wait.h>
+        // it checks if the child process terminated using the exit() system call
         if (WIFEXITED(last_fg_status)) {
+            // WEXITSTATUS extracts the actual exit code (like 0 or 1)
+            // also from <sys/wait.h>
             printf("exit value %d\n", WEXITSTATUS(last_fg_status));
-        } else if (WIFSIGNALED(last_fg_status)) {
+        }
+
+        // check if it was terminated by a signal instead (like SIGINT from Ctrl+C)
+        // WIFSIGNALED is another macro from <sys/wait.h>
+        else if (WIFSIGNALED(last_fg_status)) {
+            // WTERMSIG extracts the signal number that caused it to terminate
+            // also from <sys/wait.h>
             printf("terminated by signal %d\n", WTERMSIG(last_fg_status));
         }
+
+        // flush stdout to make sure the message shows up immediately on screen
+        // this is especially useful when using pipes or buffering
         fflush(stdout);
+
+        // return true to tell the main loop: "I handled this command"
         return true;
     }
 
@@ -354,7 +439,7 @@ void restore_child_signals() {
     // Ctrl+C will now kill child processes
     sigaction(SIGINT, &sa_default, NULL);
 
-    // Ctrl+Z still ignored — only parent should toggle mode
+    // Ctrl+Z still ignored ... only parent should toggle mode
     struct sigaction sa_ignore = {0};
     sa_ignore.sa_handler = SIG_IGN;
     sigaction(SIGTSTP, &sa_ignore, NULL);
@@ -364,35 +449,76 @@ void restore_child_signals() {
  * Sets up input/output redirection for a command
  * Uses dup2() to redirect stdin and stdout as needed
  * For background jobs with no redirection, sends to /dev/null
+ * 
+ * Libraries used:
+ * - <fcntl.h> for open(), O_RDONLY, O_WRONLY, O_CREAT, O_TRUNC
+ * - <unistd.h> for dup2(), close()
+ * - <stdio.h> for perror()
+ * - <stdlib.h> for exit()
  */
 void setup_redirection(struct command_line *cmd) {
-    // handle input redirection
+    // ========== INPUT REDIRECTION ==========
+
+    // if the command specified an input file with '<'
     if (cmd->input_file) {
+        // open the input file for reading
+        // open() comes from <fcntl.h>
+        // O_RDONLY means "read-only"
         int input_fd = open(cmd->input_file, O_RDONLY);
+
+        // if opening the file failed, print an error and exit
+        // perror() comes from <stdio.h>
+        // exit() comes from <stdlib.h>
         if (input_fd == -1) {
             perror("cannot open input file");
-            exit(1);
+            exit(1);  // child will exit, parent will detect failure
         }
-        dup2(input_fd, STDIN_FILENO); // redirect stdin
+
+        // dup2() duplicates input_fd onto STDIN (file descriptor 0)
+        // this redirects standard input to read from the file instead
+        // dup2() is from <unistd.h>
+        dup2(input_fd, STDIN_FILENO);
+
+        // close the original file descriptor now that it's duplicated
         close(input_fd);
-    } else if (cmd->is_bg && !fg_only_mode) {
-        // background process with no input file → /dev/null
-        int devnull = open("/dev/null", O_RDONLY);
-        dup2(devnull, STDIN_FILENO);
-        close(devnull);
     }
 
-    // handle output redirection
+    // if no input file was provided but this is a background process (and we're not in foreground-only mode)
+    else if (cmd->is_bg && !fg_only_mode) {
+        // open /dev/null for reading to suppress input
+        // this is a special "black hole" file that discards data
+        int devnull = open("/dev/null", O_RDONLY);
+        dup2(devnull, STDIN_FILENO); // redirect stdin to /dev/null
+        close(devnull);              // clean up
+    }
+
+    // ========== OUTPUT REDIRECTION ==========
+
+    // if the command specified an output file with '>'
     if (cmd->output_file) {
+        // open (or create) the file for writing
+        // O_WRONLY: write-only mode
+        // O_CREAT: create file if it doesn’t exist
+        // O_TRUNC: overwrite file if it exists
+        // 0644: standard permissions (rw-r--r--)
         int output_fd = open(cmd->output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+
+        // error handling if open fails
         if (output_fd == -1) {
             perror("cannot open output file");
             exit(1);
         }
-        dup2(output_fd, STDOUT_FILENO); // redirect stdout
+
+        // redirect STDOUT (fd 1) to output_fd
+        dup2(output_fd, STDOUT_FILENO);
+
+        // cleanup the original file descriptor
         close(output_fd);
-    } else if (cmd->is_bg && !fg_only_mode) {
-        // background process with no output file → /dev/null
+    }
+
+    // if no output file but background job (and not in fg-only mode)
+    else if (cmd->is_bg && !fg_only_mode) {
+        // suppress standard output by redirecting to /dev/null
         int devnull = open("/dev/null", O_WRONLY);
         dup2(devnull, STDOUT_FILENO);
         close(devnull);
@@ -426,7 +552,10 @@ int main() {
 
         // if the user just hit enter or typed a comment, skip this loop
         if (!cmd || cmd->argc == 0) {
-            free_command(cmd); // still clean up any memory
+            if (cmd != NULL) 
+            {
+                free_command(cmd);
+            }
             continue;
         }
 
@@ -442,6 +571,7 @@ int main() {
         pid_t spawnpid = fork();
 
         // child process (this is where we run the actual command)
+        // child process is always 0 just beahvior of fork()
         if (spawnpid == 0) {
             // let child handle ctrl+c normally again
             // so it can be killed if it's running in foreground
@@ -462,10 +592,11 @@ int main() {
         }
 
         // parent process (this is still the shell)
+        // fork() gives >0 just accept
         else if (spawnpid > 0) {
             // if the command ended with & and we're not in fg-only mode
             if (cmd->is_bg && !fg_only_mode) {
-                // background mode - don't wait
+                // background mode ... don't wait
                 // just print the background pid and save it to track later
                 printf("background pid is %d\n", spawnpid);
                 fflush(stdout);
